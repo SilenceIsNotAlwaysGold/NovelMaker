@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Novel {
+  id        String   @id @default(cuid())
+  title     String
+  genre     String   // xuanhuan, dushi, xuanyi, yanqing, wuxia, kehuan, lishi
+  logline   String   @default("")
+  status    String   @default("active") // active, completed, archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings   NovelSettings?
+  gene       Gene?
+  volumes    Volume[]
+  characters Character[]
+  worldview  WorldviewEntry[]
+  foreshadow Foreshadow[]
+  workflow   WorkflowState?
+}
+
+model NovelSettings {
+  id            String @id @default(cuid())
+  novelId       String @unique
+  novel         Novel  @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  llmModel      String @default("claude-sonnet-4-20250514")
+  maxTokens     Int    @default(4096)
+  temperature   Float  @default(0.8)
+  chapterMinLen Int    @default(3000)
+  chapterMaxLen Int    @default(5000)
+  tokenBudget   Int    @default(6000) // memory context token budget
+}
+
+model Gene {
+  id        String   @id @default(cuid())
+  novelId   String   @unique
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  content   String   @default("") // markdown content, <2000 chars
+  updatedAt DateTime @updatedAt
+}
+
+model Volume {
+  id        String   @id @default(cuid())
+  novelId   String
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int
+  summary   String   @default("") // 卷概要
+  memory    String   @default("") // 卷记忆, <3000 chars
+  status    String   @default("planning") // planning, writing, closing, completed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  arcs     Arc[]
+  chapters Chapter[]
+
+  @@index([novelId, sortOrder])
+}
+
+model Arc {
+  id        String   @id @default(cuid())
+  volumeId  String
+  volume    Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  title     String
+  summary   String   @default("") // 弧线摘要
+  memory    String   @default("") // 弧线记忆, <2000 chars
+  sortOrder Int
+  status    String   @default("active") // active, completed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chapters Chapter[]
+
+  @@index([volumeId, sortOrder])
+}
+
+model Chapter {
+  id        String   @id @default(cuid())
+  volumeId  String
+  volume    Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
+  arcId     String?
+  arc       Arc?     @relation(fields: [arcId], references: [id], onDelete: SetNull)
+  title     String
+  sortOrder Int
+  content   String   @default("") // markdown content
+  outline   String   @default("") // chapter outline
+  summary   String   @default("") // chapter summary for memory
+  wordCount Int      @default(0)
+  status    String   @default("outline") // outline, draft, revised, final
+  // Chapter continuity context (auto-generated after each chapter is saved)
+  endingMood     String @default("") // emotional tone at chapter end: tense/warm/dark/hopeful...
+  unresolvedHooks String @default("") // unresolved conflicts/cliffhangers from this chapter
+  nextChapterHint String @default("") // what the next chapter should address
+  activeCharacters String @default("") // characters present at chapter end, their states
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([volumeId, sortOrder])
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  novelId     String
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  name        String
+  role        String   @default("supporting") // protagonist, antagonist, supporting, minor
+  profile     String   @default("") // character profile markdown
+  personality String   @default("")
+  appearance  String   @default("")
+  background  String   @default("")
+  // Voice print: dialogue samples that define how this character speaks
+  voiceSamples   String @default("") // 3-5 representative dialogue lines, one per line
+  speechPattern  String @default("") // e.g. "说话简短有力，常用反问，喜欢冷嘲热讽"
+  verbalHabits   String @default("") // catchphrases, dialect, speech quirks
+  behaviorPattern String @default("") // habitual actions under stress/joy/anger
+  // Dynamic state tracking (updated per chapter)
+  currentState   String @default("") // emotional state, location, goals as of latest chapter
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  relationsFrom CharacterRelation[] @relation("FromCharacter")
+  relationsTo   CharacterRelation[] @relation("ToCharacter")
+
+  @@index([novelId])
+}
+
+model CharacterRelation {
+  id            String    @id @default(cuid())
+  fromId        String
+  from          Character @relation("FromCharacter", fields: [fromId], references: [id], onDelete: Cascade)
+  toId          String
+  to            Character @relation("ToCharacter", fields: [toId], references: [id], onDelete: Cascade)
+  relationship  String    // e.g. "师徒", "宿敌", "恋人"
+  description   String    @default("")
+
+  @@unique([fromId, toId])
+}
+
+model WorldviewEntry {
+  id        String   @id @default(cuid())
+  novelId   String
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  category  String   // e.g. "地理", "势力", "功法", "历史"
+  title     String
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([novelId, category])
+}
+
+model Foreshadow {
+  id          String   @id @default(cuid())
+  novelId     String
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  title       String
+  description String   @default("")
+  status      String   @default("planted") // planted, partial, resolved, abandoned
+  plantedAt   String   @default("") // e.g. "卷一第3章"
+  resolvedAt  String   @default("") // e.g. "卷二第15章"
+  // Active reminder system
+  hintStrategy  String @default("") // how to hint at this foreshadow before resolving
+  targetResolve String @default("") // planned resolution point, e.g. "卷二第10-15章"
+  urgency       Int    @default(0)  // 0=no rush, 1=should hint soon, 2=overdue for resolution
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  links ForeshadowLink[]
+
+  @@index([novelId, status])
+}
+
+model ForeshadowLink {
+  id           String     @id @default(cuid())
+  foreshadowId String
+  foreshadow   Foreshadow @relation(fields: [foreshadowId], references: [id], onDelete: Cascade)
+  chapterRef   String     // e.g. "卷一第3章"
+  type         String     // "plant", "hint", "resolve"
+  note         String     @default("")
+}
+
+model WorkflowState {
+  id           String   @id @default(cuid())
+  novelId      String   @unique
+  novel        Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  currentStage String   @default("brainstorm") // brainstorm, skeleton, volume_planning, chapter_writing, volume_closing, book_closing
+  stageData    String   @default("{}") // JSON: stage-specific data
+  updatedAt    DateTime @updatedAt
+}
