@@ -1,7 +1,42 @@
 import { z } from 'zod'
 import { router, publicProcedure } from '../trpc'
+import { checkSceneStructure } from '../services/quality.service'
 
 export const statsRouter = router({
+  getTensionCurve: publicProcedure
+    .input(z.object({ novelId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const volumes = await ctx.db.volume.findMany({
+        where: { novelId: input.novelId },
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          chapters: {
+            orderBy: { sortOrder: 'asc' },
+            select: { id: true, title: true, content: true, endingMood: true, wordCount: true },
+          },
+        },
+      })
+
+      const points: { chapterTitle: string; volumeTitle: string; tension: number; mood: string; wordCount: number }[] = []
+      for (const vol of volumes) {
+        for (const ch of vol.chapters) {
+          if (!ch.content || ch.wordCount < 100) {
+            points.push({ chapterTitle: ch.title, volumeTitle: vol.title, tension: 0, mood: ch.endingMood || '', wordCount: ch.wordCount })
+            continue
+          }
+          const scene = checkSceneStructure(ch.content)
+          points.push({
+            chapterTitle: ch.title,
+            volumeTitle: vol.title,
+            tension: scene.beatScore,
+            mood: ch.endingMood || '',
+            wordCount: ch.wordCount,
+          })
+        }
+      }
+      return points
+    }),
+
   getNovelStats: publicProcedure
     .input(z.object({ novelId: z.string() }))
     .query(async ({ ctx, input }) => {

@@ -5,7 +5,7 @@ import { db } from '../db'
 import { assembleMemoryContext } from './memory.service'
 import { buildWritingSystemPrompt, buildExpansionPrompt, hookTechniques, pacingGuide } from './writing-knowledge'
 
-type AIOperation = 'continue' | 'rewrite' | 'expand' | 'summarize' | 'brainstorm'
+type AIOperation = 'continue' | 'rewrite' | 'expand' | 'summarize' | 'brainstorm' | 'polish_dialogue' | 'scene_analysis'
 
 function getModel(modelId: string) {
   if (modelId.startsWith('claude') || modelId.startsWith('anthropic')) {
@@ -120,6 +120,52 @@ ${selectedText}
 ${selectedText}
 
 摘要：`
+
+    case 'polish_dialogue':
+      return `你是一位专业的对话打磨师。请根据角色声纹信息，逐句检查并优化以下对话片段。
+
+核心原则：
+1. 每个角色的语言必须有独特辨识度——遮住名字也能猜出是谁在说话
+2. 对话要有潜台词（角色嘴上说的≠心里想的）
+3. 用动作 beats 代替"他说/她说"等对话标签
+4. 删除所有不自然的书面语（"我认为""事实上""从某种意义上"）
+5. 加入角色特有的口头禅、断句方式、语气词
+6. 对话要推进情节或揭示性格，删除废话和信息灌输式对话
+
+${context}
+
+---
+需要打磨的对话：
+${selectedText}
+
+请输出：
+1. 首先列出每个角色的声纹要点（如果上下文有角色信息）
+2. 逐段打磨后的对话（直接输出可替换原文的版本）
+3. 简要说明改动理由（不超过3行）
+
+打磨后的对话：`
+
+    case 'scene_analysis':
+      return `你是一位资深小说编辑，请对以下章节/片段进行场景结构分析。
+
+按以下 beat 拆解：
+1. 【开篇钩子】前200字是否有效抓住读者？用了什么技巧？
+2. 【冲突建立】核心矛盾是什么？何时出现？
+3. 【张力递进】紧张感是否逐步升级？有无泄气点？
+4. 【高潮时刻】本章最强爽点/情感冲击点在哪？
+5. 【结尾悬念】结尾是否留钩子？能否驱动翻页欲？
+6. 【节奏评估】快慢交替是否合理？有无拖沓段落？
+7. 【角色表现】主要角色是否有目标-行动-后果的完整弧？
+
+${context}
+
+---
+章节内容：
+${selectedText}
+
+请输出结构化分析，每个 beat 给出评分（A/B/C/D）和具体建议。最后给出整体评分和最需要改进的TOP3问题。
+
+分析结果：`
 
     case 'brainstorm':
       return `基于以下小说设定信息，进行创意头脑风暴。

@@ -61,6 +61,9 @@ export default function NovelOverviewPage() {
       {/* Stats Dashboard */}
       <StatsPanel novelId={novelId} novel={novel} />
 
+      {/* Tension Curve */}
+      <TensionCurve novelId={novelId} />
+
       {/* Volumes & Chapters */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -105,8 +108,16 @@ export default function NovelOverviewPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-            还没有创建卷，点击上方按钮添加第一卷
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <FileText className="mx-auto h-10 w-10 text-muted-foreground/30" />
+            <p className="mt-3 font-medium">还没有创建卷</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              添加第一卷开始你的创作之旅
+            </p>
+            <Button className="mt-4" size="sm" onClick={() => setVolumeDialogOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              添加第一卷
+            </Button>
           </div>
         )}
       </div>
@@ -286,6 +297,94 @@ function StatsPanel({ novelId, novel }: { novelId: string; novel: { volumes: { _
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function TensionCurve({ novelId }: { novelId: string }) {
+  const { data: points } = trpc.stats.getTensionCurve.useQuery({ novelId })
+  if (!points || points.length < 2) return null
+
+  const width = 700
+  const height = 200
+  const padX = 40
+  const padY = 20
+  const plotW = width - padX * 2
+  const plotH = height - padY * 2
+
+  const maxTension = Math.max(...points.map((p) => p.tension), 100)
+  const stepX = plotW / Math.max(points.length - 1, 1)
+
+  const pathPoints = points.map((p, i) => ({
+    x: padX + i * stepX,
+    y: padY + plotH - (p.tension / maxTension) * plotH,
+  }))
+
+  // Smooth curve using quadratic bezier
+  let pathD = `M ${pathPoints[0].x} ${pathPoints[0].y}`
+  for (let i = 1; i < pathPoints.length; i++) {
+    const prev = pathPoints[i - 1]
+    const curr = pathPoints[i]
+    const cpX = (prev.x + curr.x) / 2
+    pathD += ` Q ${cpX} ${prev.y} ${curr.x} ${curr.y}`
+  }
+
+  // Gradient fill path
+  const fillD = pathD + ` L ${pathPoints[pathPoints.length - 1].x} ${padY + plotH} L ${pathPoints[0].x} ${padY + plotH} Z`
+
+  // Color based on tension
+  const getColor = (t: number) => {
+    if (t >= 70) return '#ef4444'
+    if (t >= 40) return '#f59e0b'
+    return '#22c55e'
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">张力曲线</CardTitle>
+      </CardHeader>
+      <CardContent className="pb-3">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxHeight: 220 }}>
+          <defs>
+            <linearGradient id="tensionGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {/* Grid lines */}
+          {[0, 25, 50, 75, 100].map((v) => {
+            const y = padY + plotH - (v / maxTension) * plotH
+            return (
+              <g key={v}>
+                <line x1={padX} y1={y} x2={padX + plotW} y2={y} stroke="hsl(var(--border))" strokeWidth="0.5" strokeDasharray="4,4" />
+                <text x={padX - 6} y={y + 3} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize="9">{v}</text>
+              </g>
+            )
+          })}
+          {/* Fill area */}
+          <path d={fillD} fill="url(#tensionGrad)" />
+          {/* Line */}
+          <path d={pathD} fill="none" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" />
+          {/* Data points */}
+          {pathPoints.map((pt, i) => (
+            <g key={i}>
+              <circle cx={pt.x} cy={pt.y} r="4" fill={getColor(points[i].tension)} stroke="white" strokeWidth="1.5" />
+              {/* Label every other point or all if few */}
+              {(points.length <= 10 || i % 2 === 0) && (
+                <text x={pt.x} y={padY + plotH + 14} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="8">
+                  {points[i].chapterTitle.length > 5 ? points[i].chapterTitle.slice(0, 5) + '…' : points[i].chapterTitle}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+        <div className="flex justify-center gap-4 mt-2 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-green-500" />低张力(0-40)</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />中张力(40-70)</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-red-500" />高张力(70+)</span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Plus, Sparkles, PenTool, Brain, BarChart3, ArrowRight } from 'lucide-react'
+import { BookOpen, Plus, Sparkles, PenTool, Brain, BarChart3, ArrowRight, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { NovelCreateDialog } from '@/components/novel/novel-create-dialog'
 import { trpc } from '@/lib/trpc'
 
 const genreMap: Record<string, string> = {
@@ -19,6 +21,7 @@ const genreMap: Record<string, string> = {
 
 export default function HomePage() {
   const router = useRouter()
+  const [createOpen, setCreateOpen] = useState(false)
   const { data: novels } = trpc.novel.list.useQuery()
   const recentNovels = novels?.slice(0, 6)
 
@@ -35,9 +38,13 @@ export default function HomePage() {
             每一条伏笔，帮你写出 20 万到 100 万字的完整长篇。
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button size="lg" onClick={() => router.push('/novels?create=true')}>
+            <Button size="lg" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               开始创作
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => router.push('/novels/create-from-idea')}>
+              <Wand2 className="mr-2 h-4 w-4" />
+              主题推演
             </Button>
             <Button size="lg" variant="outline" onClick={() => router.push('/novels/create-from-reference')}>
               <Sparkles className="mr-2 h-4 w-4" />
@@ -51,7 +58,6 @@ export default function HomePage() {
             )}
           </div>
         </div>
-        {/* Decorative elements */}
         <div className="absolute -right-8 -top-8 h-64 w-64 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-12 right-20 h-48 w-48 rounded-full bg-primary/8 blur-2xl" />
       </div>
@@ -158,13 +164,15 @@ export default function HomePage() {
             <p className="mt-2 text-sm text-muted-foreground">
               点击"开始创作"创建你的第一部长篇小说
             </p>
-            <Button className="mt-6" onClick={() => router.push('/novels?create=true')}>
+            <Button className="mt-6" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               创建第一部小说
             </Button>
           </div>
         )
       )}
+
+      <NovelCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }

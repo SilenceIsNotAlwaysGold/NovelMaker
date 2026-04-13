@@ -132,6 +132,10 @@
 /* Tiptap editor styles */
 .tiptap {
   outline: none;
+  max-width: 680px;
+  margin: 0 auto;
+  font-family: "Georgia", "Noto Serif SC", "Source Han Serif SC", serif;
+  font-size: 1.05rem;
 }
 
 .tiptap p.is-editor-empty:first-child::before {
@@ -140,11 +144,17 @@
   color: var(--muted-foreground);
   pointer-events: none;
   height: 0;
+  font-family: var(--font-sans);
 }
 
 .tiptap p {
   margin-bottom: 0.75em;
   line-height: 2;
+  text-indent: 2em;
+}
+
+.tiptap p:has(> img), .tiptap p:empty {
+  text-indent: 0;
 }
 
 .tiptap h1, .tiptap h2, .tiptap h3 {

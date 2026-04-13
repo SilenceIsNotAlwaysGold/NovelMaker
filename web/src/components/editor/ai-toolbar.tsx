@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Wand2, PenLine, Expand, Sparkles, Loader2, X, Check } from 'lucide-react'
+import { Wand2, PenLine, Expand, Sparkles, Loader2, X, Check, MessageSquare, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-type AIOperation = 'continue' | 'rewrite' | 'expand'
+type AIOperation = 'continue' | 'rewrite' | 'expand' | 'polish_dialogue' | 'scene_analysis'
 
 interface AIToolbarProps {
   novelId: string
@@ -96,7 +96,9 @@ export function AIToolbar({
 
   const handleAccept = () => {
     if (!completion) return
-    if (currentOp === 'continue') {
+    if (currentOp === 'scene_analysis') {
+      // Scene analysis is read-only, just dismiss
+    } else if (currentOp === 'continue') {
       onInsert(completion)
     } else {
       onReplace(completion)
@@ -140,6 +142,19 @@ export function AIToolbar({
               <Expand className="mr-2 h-4 w-4" />
               扩写{!selectedText && '（请先选中文本）'}
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleOperation('polish_dialogue')}
+              disabled={!selectedText}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              对话打磨{!selectedText && '（请先选中对话）'}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleOperation('scene_analysis')}
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              场景结构分析
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -163,17 +178,21 @@ export function AIToolbar({
               {currentOp === 'continue' && ' - 续写'}
               {currentOp === 'rewrite' && ' - 改写'}
               {currentOp === 'expand' && ' - 扩写'}
+              {currentOp === 'polish_dialogue' && ' - 对话打磨'}
+              {currentOp === 'scene_analysis' && ' - 场景结构分析'}
             </span>
             {showPreview && (
               <div className="flex gap-1">
                 <Button size="sm" variant="ghost" onClick={handleReject}>
                   <X className="mr-1 h-3 w-3" />
-                  丢弃
+                  {currentOp === 'scene_analysis' ? '关闭' : '丢弃'}
                 </Button>
-                <Button size="sm" onClick={handleAccept}>
-                  <Check className="mr-1 h-3 w-3" />
-                  采纳
-                </Button>
+                {currentOp !== 'scene_analysis' && (
+                  <Button size="sm" onClick={handleAccept}>
+                    <Check className="mr-1 h-3 w-3" />
+                    采纳
+                  </Button>
+                )}
               </div>
             )}
           </div>

@@ -15,13 +15,20 @@ export default function NovelSettingsPage() {
   const utils = trpc.useUtils()
 
   const [form, setForm] = useState({
-    llmModel: 'claude-sonnet-4-20250514',
+    llmModel: '',
     maxTokens: 4096,
     temperature: 0.8,
     chapterMinLen: 3000,
     chapterMaxLen: 5000,
     tokenBudget: 6000,
   })
+
+  // Load env default model on mount
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      setForm(prev => prev.llmModel ? prev : { ...prev, llmModel: cfg.defaultModel || 'deepseek-chat' })
+    })
+  }, [])
   const [dirty, setDirty] = useState(false)
 
   const updateMutation = trpc.settings.update.useMutation({
