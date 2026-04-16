@@ -3,8 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/layout/theme-provider'
 import { TRPCProvider } from '@/lib/trpc-provider'
-import { Sidebar } from '@/components/layout/sidebar'
-import { Header } from '@/components/layout/header'
+import { AuthGuard } from '@/components/layout/auth-guard'
+import { AppShell } from '@/components/layout/app-shell'
 import { Toaster } from '@/components/ui/sonner'
 
 const geistSans = Geist({
@@ -36,13 +36,9 @@ export default function RootLayout({
       <body className="min-h-full">
         <ThemeProvider>
           <TRPCProvider>
-            <div className="flex h-screen">
-              <Sidebar />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-6">{children}</main>
-              </div>
-            </div>
+            <AuthGuard>
+              <AppShell>{children}</AppShell>
+            </AuthGuard>
             <Toaster />
           </TRPCProvider>
         </ThemeProvider>

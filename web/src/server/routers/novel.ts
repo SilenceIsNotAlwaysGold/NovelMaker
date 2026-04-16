@@ -1,9 +1,10 @@
 import { z } from 'zod'
-import { router, publicProcedure } from '../trpc'
+import { router, protectedProcedure } from '../trpc'
 
 export const novelRouter = router({
-  list: publicProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.novel.findMany({
+      where: { userId: ctx.user.id },
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: { select: { volumes: true, characters: true } },
@@ -12,9 +13,9 @@ export const novelRouter = router({
     })
   }),
 
-  getById: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+  getById: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     return ctx.db.novel.findUniqueOrThrow({
-      where: { id: input.id },
+      where: { id: input.id, userId: ctx.user.id },
       include: {
         settings: true,
         gene: true,
@@ -30,7 +31,7 @@ export const novelRouter = router({
     })
   }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1),
@@ -44,6 +45,7 @@ export const novelRouter = router({
           title: input.title,
           genre: input.genre,
           logline: input.logline ?? '',
+          userId: ctx.user.id,
           settings: { create: {} },
           gene: { create: {} },
           workflow: { create: {} },
@@ -51,7 +53,7 @@ export const novelRouter = router({
       })
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -63,10 +65,10 @@ export const novelRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
-      return ctx.db.novel.update({ where: { id }, data })
+      return ctx.db.novel.update({ where: { id, userId: ctx.user.id }, data })
     }),
 
-  delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
-    return ctx.db.novel.delete({ where: { id: input.id } })
+  delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    return ctx.db.novel.delete({ where: { id: input.id, userId: ctx.user.id } })
   }),
 })
