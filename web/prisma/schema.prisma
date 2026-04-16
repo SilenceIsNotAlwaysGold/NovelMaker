@@ -8,6 +8,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @default("")
+  name         String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  novels   Novel[]
+  accounts Account[]
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  access_token      String?
+  token_type        String?
+  scope             String?
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
 model Novel {
   id        String   @id @default(cuid())
   title     String
@@ -16,6 +45,8 @@ model Novel {
   status    String   @default("active") // active, completed, archived
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   settings   NovelSettings?
   gene       Gene?
@@ -24,6 +55,8 @@ model Novel {
   worldview  WorldviewEntry[]
   foreshadow Foreshadow[]
   workflow   WorkflowState?
+
+  @@index([userId])
 }
 
 model NovelSettings {

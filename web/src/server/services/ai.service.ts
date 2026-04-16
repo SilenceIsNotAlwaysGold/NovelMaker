@@ -4,8 +4,10 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { db } from '../db'
 import { assembleMemoryContext } from './memory.service'
 import { buildWritingSystemPrompt, buildExpansionPrompt, hookTechniques, pacingGuide } from './writing-knowledge'
+import { runQualityCheck } from './quality.service'
+import type { QualityReport, RewriteSuggestion } from './quality.service'
 
-type AIOperation = 'continue' | 'rewrite' | 'expand' | 'summarize' | 'brainstorm' | 'polish_dialogue' | 'scene_analysis'
+type AIOperation = 'continue' | 'rewrite' | 'expand' | 'summarize' | 'brainstorm' | 'polish_dialogue' | 'scene_analysis' | 'quality_rewrite'
 
 function getModel(modelId: string) {
   if (modelId.startsWith('claude') || modelId.startsWith('anthropic')) {
@@ -50,11 +52,18 @@ function buildPrompt(
       return `基于以下上下文信息和已有内容，继续创作下一段。
 
 要求：
-- 自然衔接已有内容，不重复
+- 自然衔接已有内容，不重复已有的词句和意象
 - 用动作和对话推进，不用旁白概述
 - 保持该场景的紧张感或情感基调
 - 如果接近章节结尾，使用章末悬念技巧
 - 每个角色说话必须有各自的语言风格
+
+质量红线（违反任意一条需重写）：
+- 禁用：然而、不禁、仿佛、宛如、内心深处、心中暗想、此刻、眼眸、薄唇
+- 不连续3句以"他/她"开头，句首要有变化
+- "感到/觉得"每段最多1次，优先用动作展示情绪
+- 句子长短交替，不连续3句相同长度
+- 对话不超过60字/句，超过需用动作beats打断
 
 ${hookTechniques.ending}
 
@@ -70,12 +79,14 @@ ${selectedText}
       return `改写下面这段文字，核心情节不变，大幅提升文笔质量。
 ${instruction ? `特别要求：${instruction}` : ''}
 
-改写方向：
-- 抽象情感→具体动作和细节（"他很紧张"→写出紧张的具体表现）
-- 平铺直叙→有节奏的长短句交替
-- 通用描写→符合角色个性的独特表达
-- 如果有对话，确保每个角色声音不同
-- 删除所有AI味词汇（然而、不禁、仿佛、宛如等）
+改写方向（按优先级）：
+1. 抽象情感→具体动作和细节（"他很紧张"→"手指反复按压笔帽，咔嗒咔嗒"）
+2. 平铺直叙→有节奏的长短句交替（长句铺陈→短句冲击→长句转折）
+3. 通用描写→符合角色个性的独特表达
+4. 如果有对话，确保每个角色声音不同，用动作beats代替"他说"
+5. 删除所有AI味词汇（然而、不禁、仿佛、宛如、内心深处、眼眸、薄唇、璀璨、氤氲）
+6. 消除重复句首——不连续3句以"他/她"开头
+7. 感官描写选2-3种具体的（不要五感齐上），服务于氛围
 
 ${context}
 
@@ -184,9 +195,37 @@ ${context}
 
 创意方向：`
 
+    case 'quality_rewrite':
+      return buildQualityRewritePrompt(context, selectedText, instruction)
+
     default:
       return selectedText
   }
+}
+
+function buildQualityRewritePrompt(context: string, selectedText: string, qualityFeedback?: string): string {
+  return `你是一位顶级小说编辑，擅长在保持原文情节不变的前提下大幅提升文笔质量。
+
+以下是质量检测系统发现的问题：
+${qualityFeedback || '（未提供具体问题）'}
+
+请根据以上问题逐一修复，改写下面的文本。
+
+改写原则（按优先级排序）：
+1. 【去AI味】删除所有黑名单词汇（然而、不禁、仿佛、宛如、内心深处等），用具体动作替代
+2. 【展示不叙述】所有"他感到X"改为具体行为表现（搓手=紧张，捏拳=愤怒，移开视线=心虚）
+3. 【消除重复】变化句首（不连续3句用"他/她"开头），替换重复短语
+4. 【调整节奏】长句铺陈+短句冲击交替，段落长短穿插
+5. 【强化结构】确保开头有钩子、结尾有悬念、中间有冲突
+6. 【对话个性化】每个角色说话方式不同，用动作beats代替"他说"
+
+${context}
+
+---
+需要改写的原文：
+${selectedText}
+
+改写后（直接输出可替换原文的完整版本，不加任何说明）：`
 }
 
 export async function generateNovelText(params: {

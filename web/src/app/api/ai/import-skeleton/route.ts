@@ -1,6 +1,12 @@
 import { db } from '@/server/db'
+import { getUserFromRequest } from '@/server/auth'
 
 export async function POST(req: Request) {
+  const user = await getUserFromRequest(req)
+  if (!user) {
+    return Response.json({ error: '请先登录' }, { status: 401 })
+  }
+
   const data = await req.json()
 
   // Create novel
@@ -9,6 +15,7 @@ export async function POST(req: Request) {
       title: data.title || '未命名小说',
       genre: data.genre || 'xuanhuan',
       logline: data.logline || '',
+      userId: user.id,
       settings: { create: { llmModel: process.env.DEFAULT_MODEL ?? 'deepseek-chat' } },
       gene: { create: { content: data.gene || '' } },
       workflow: { create: {} },
